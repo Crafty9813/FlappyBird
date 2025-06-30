@@ -1,4 +1,5 @@
 import pygame
+import random
 
 pygame.init()
 
@@ -12,9 +13,12 @@ screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption("Flappy Bird")
 
 gnd_x = 0
-gnd_speed = 4 # 4 px
+scroll_speed = 2 # 4 px
 flying = False
 game_over = False
+pipe_gap = 150
+pipe_frequency = 1500 # ms
+last_pipe = pygame.time.get_ticks() - pipe_frequency
 
 # Images
 background = pygame.image.load('images/background.png')
@@ -72,7 +76,30 @@ class Bird(pygame.sprite.Sprite):
         self.image = pygame.transform.rotate(self.images[self.index], self.vel * -2)
 
 
+class Pipe(pygame.sprite.Sprite):
+        def __init__(self, x, y, pos):
+            pygame.sprite.Sprite.__init__(self)
+            self.image = pygame.image.load('images/pipe.png')
+            self.rect = self.image.get_rect()
+
+            # pos 1 is from top, -1 is from bottom
+            if pos == 1:
+                self.image = pygame.transform.flip(self.image, False, True)
+                self.rect.bottomleft = [x, y - int(pipe_gap / 2)]
+            if pos == -1:
+                self.rect.topleft = [x, y + int(pipe_gap / 2)]
+
+        def update(self):
+            self.rect.x -= scroll_speed
+
+            # Delete pipe if pipe is off screen
+            if self.rect.right < 0:
+                self.kill 
+            
+
+
 bird_group = pygame.sprite.Group()
+pipe_group = pygame.sprite.Group()
 
 bird = Bird(100, 375)
 
@@ -91,20 +118,43 @@ while run:
     bird_group.draw(screen)
     bird_group.update()
 
+    pipe_group.draw(screen)
+    pipe_group.update()
+
     # Draw ground
     screen.blit(gnd, (gnd_x, 640))
 
+    # Collision with pipes
+    if pygame.sprite.groupcollide(bird_group, pipe_group, False, False) or bird.rect.top < 0:
+        game_over = True
+
     # Game over if hit gnd
-    if bird.rect.bottom > 640:
+    if bird.rect.bottom >= 640:
         game_over = True
         flying = False
 
-    if game_over == False:
-        gnd_x -= gnd_speed
-        
+    if game_over == False and flying == True:
+
+        # New pipes
+        current_time = pygame.time.get_ticks()
+
+        if current_time - last_pipe > pipe_frequency:
+            pipe_height = random.randint(-100, 100) # Random pipe heights
+
+            bottom_pipe = Pipe(screen_width, int(screen_height / 2) + pipe_height, -1)
+            top_pipe = Pipe(screen_width, int(screen_height / 2) + pipe_height, 1)
+            pipe_group.add(bottom_pipe, top_pipe)
+            last_pipe = current_time
+
+
+        # Scroll ground
+        gnd_x -= scroll_speed
+
         #if gnd past 1st notch reset it to be safe & gnd always is there w/ scroll effect
         if abs (gnd_x) > 35:
             gnd_x = 0
+
+        pipe_group.update()
 
 
     # Exit window
